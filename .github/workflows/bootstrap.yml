@@ -24,7 +24,10 @@ jobs:
             .bootstrap/part-00-2-0
             .bootstrap/part-00-2-1
             .bootstrap/part-00-2-2
-            .bootstrap/part-00-2-3
+            .bootstrap/part-00-2-3-0
+            .bootstrap/part-00-2-3-1
+            .bootstrap/part-00-2-3-2
+            .bootstrap/part-00-2-3-3
             .bootstrap/part-01
             .bootstrap/part-02
             .bootstrap/part-03-0
@@ -43,7 +46,10 @@ jobs:
           b50575b08cb63052073a90f022e26caa5d3724459e52b43bd4e2a5cfa4b58a87  .bootstrap/part-00-2-0
           22de14aa2d16f904ae3512966c19f5b890a4099b0ab9cec2d19591491cf8879f  .bootstrap/part-00-2-1
           9316f048a98e8ecf881f32713077de9a144ff838ada682e82f392ad8ea680a34  .bootstrap/part-00-2-2
-          33865633e13b360857912cde7420b2ca56dabeef1c703c46a28b5bb83f33168b  .bootstrap/part-00-2-3
+          5a10a0ca45bfd01222e854b46f1be55e3f94fb53b2b2ecd82c5bc9a5694c98cb  .bootstrap/part-00-2-3-0
+          4654636e81dfa5b7e2bb3e73ca9494764a2404801eff5268213da846ad8656b0  .bootstrap/part-00-2-3-1
+          0a4b9b22170df69976a1bfffab5485550d99de4f083aecf2184bb9ac49af1b5e  .bootstrap/part-00-2-3-2
+          3eca0410001712998a9398924d01d1dff95955a01b877c5c705773a8cff10593  .bootstrap/part-00-2-3-3
           9f9bb5003d0ef3c311545d5ece1af90fc5aa6c41a1286ae962eb2c214f122fbf  .bootstrap/part-01
           a10d5f187fbcc1d4e19cf689949cef226b7b80edcf82b0f5e6ea99af204ea198  .bootstrap/part-02
           9f6245402715bde0024df2cf0c319b46d33f1436536debfd6f0d624545b7b46d  .bootstrap/part-03-0
@@ -59,7 +65,10 @@ jobs:
             .bootstrap/part-00-2-0 \
             .bootstrap/part-00-2-1 \
             .bootstrap/part-00-2-2 \
-            .bootstrap/part-00-2-3 \
+            .bootstrap/part-00-2-3-0 \
+            .bootstrap/part-00-2-3-1 \
+            .bootstrap/part-00-2-3-2 \
+            .bootstrap/part-00-2-3-3 \
             .bootstrap/part-01 \
             .bootstrap/part-02 \
             .bootstrap/part-03-0 \
