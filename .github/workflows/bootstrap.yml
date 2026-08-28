@@ -18,11 +18,13 @@ jobs:
 
       - name: Normalize, verify, and unpack source
         run: |
-          # All replacement subchunks are committed before this run starts.
           files=(
             .bootstrap/part-00-0
             .bootstrap/part-00-1
-            .bootstrap/part-00-2
+            .bootstrap/part-00-2-0
+            .bootstrap/part-00-2-1
+            .bootstrap/part-00-2-2
+            .bootstrap/part-00-2-3
             .bootstrap/part-01
             .bootstrap/part-02
             .bootstrap/part-03-0
@@ -38,7 +40,10 @@ jobs:
           cat > /tmp/parts.sha <<'EOF'
           76a5eb47385a4b17beba38073ac8443fdf3f97446ff7323d1dc46bac86f63a80  .bootstrap/part-00-0
           2517d998ab60db9a008ebaaf8a71d7d3c5fd8b3ccafc19d940b31f9063e51b27  .bootstrap/part-00-1
-          f9f9bcb6bd633c2b47b009ef14eb0dbe383ceac4e3245b5d31d4f506c06cbd96  .bootstrap/part-00-2
+          b50575b08cb63052073a90f022e26caa5d3724459e52b43bd4e2a5cfa4b58a87  .bootstrap/part-00-2-0
+          22de14aa2d16f904ae3512966c19f5b890a4099b0ab9cec2d19591491cf8879f  .bootstrap/part-00-2-1
+          9316f048a98e8ecf881f32713077de9a144ff838ada682e82f392ad8ea680a34  .bootstrap/part-00-2-2
+          33865633e13b360857912cde7420b2ca56dabeef1c703c46a28b5bb83f33168b  .bootstrap/part-00-2-3
           9f9bb5003d0ef3c311545d5ece1af90fc5aa6c41a1286ae962eb2c214f122fbf  .bootstrap/part-01
           a10d5f187fbcc1d4e19cf689949cef226b7b80edcf82b0f5e6ea99af204ea198  .bootstrap/part-02
           9f6245402715bde0024df2cf0c319b46d33f1436536debfd6f0d624545b7b46d  .bootstrap/part-03-0
@@ -51,7 +56,10 @@ jobs:
           cat \
             .bootstrap/part-00-0 \
             .bootstrap/part-00-1 \
-            .bootstrap/part-00-2 \
+            .bootstrap/part-00-2-0 \
+            .bootstrap/part-00-2-1 \
+            .bootstrap/part-00-2-2 \
+            .bootstrap/part-00-2-3 \
             .bootstrap/part-01 \
             .bootstrap/part-02 \
             .bootstrap/part-03-0 \
