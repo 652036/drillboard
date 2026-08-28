@@ -18,6 +18,7 @@ jobs:
 
       - name: Normalize, verify, and unpack source
         run: |
+          # All replacement subchunks are committed before this run starts.
           files=(
             .bootstrap/part-00-0
             .bootstrap/part-00-1
