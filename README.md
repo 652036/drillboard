@@ -6,8 +6,8 @@ Drillboard turns incident training into a shared browser room. A person and agen
 
 > The agent can coach or facilitate. The human still decides.
 
-[![CI](https://github.com/652036/web-mcp3/actions/workflows/ci.yml/badge.svg)](https://github.com/652036/web-mcp3/actions/workflows/ci.yml)
-[![Deploy](https://github.com/652036/web-mcp3/actions/workflows/pages.yml/badge.svg)](https://github.com/652036/web-mcp3/actions/workflows/pages.yml)
+[![CI](https://github.com/652036/drillboard/actions/workflows/ci.yml/badge.svg)](https://github.com/652036/drillboard/actions/workflows/ci.yml)
+[![Deploy](https://github.com/652036/drillboard/actions/workflows/pages.yml/badge.svg)](https://github.com/652036/drillboard/actions/workflows/pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-66e2d5.svg)](LICENSE)
 
 ## Why this is a WebMCP app
@@ -65,8 +65,8 @@ Every scenario is fictional. Drillboard is a training demonstration, not operati
 ## Run locally
 
 ```bash
-git clone https://github.com/652036/web-mcp3.git
-cd web-mcp3
+git clone https://github.com/652036/drillboard.git
+cd drillboard
 npm ci
 npm run dev
 ```
@@ -101,7 +101,7 @@ Tests cover time pressure, staged-vs-approved decisions, bounded injects, determ
 
 Set **Settings → Pages → Build and deployment → Source** to **GitHub Actions** once. The included workflow then verifies and publishes each push to `main`.
 
-Expected URL: `https://652036.github.io/web-mcp3/`
+Expected URL: `https://652036.github.io/drillboard/`
 
 ## License
 
