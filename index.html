@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Drillboard is a human-agent tabletop exercise simulator built for WebMCP.">
+  <meta name="theme-color" content="#101923">
+  <title>Drillboard — WebMCP Tabletop Simulator</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="src/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to command board</a>
+  <header class="topbar">
+    <a class="brand" href="#"><img src="assets/icon.svg" alt=""><span><strong>Drillboard</strong><small>human + agent tabletop simulator</small></span></a>
+    <div class="top-actions"><span id="webmcp-status" class="status-pill">Detecting WebMCP…</span><button id="tool-lab-button" class="button ghost">Tool Lab</button><button id="theme-toggle" class="button ghost">Light</button></div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div><p class="eyebrow">WebMCP Challenge project</p><h1>Practice the hard minutes before they are real.</h1><p class="lede">Drillboard lets a person and browser agent share one live tabletop exercise: injects, objectives, response proposals, forecasts, decisions, and a human-owned closeout.</p></div>
+      <div class="radar" aria-hidden="true"><i></i><i></i><i></i><span></span></div>
+    </section>
+
+    <section class="control-strip" data-view="situation">
+      <label>Scenario<select id="preset-select"></select></label>
+      <label>Agent role<select id="role-select"><option value="coach">Coach</option><option value="facilitator">Facilitator</option></select></label>
+      <div class="clock-block"><span>Exercise clock</span><strong id="exercise-clock">00:15</strong></div>
+      <div class="toolbar-buttons"><button id="undo-change" class="button ghost">Undo</button><button id="reset-exercise" class="button ghost">Reset</button><button id="advance-15" class="button ghost">+15 min</button><button id="advance-30" class="button primary">+30 min</button></div>
+    </section>
+    <p id="role-copy" class="role-copy"></p>
+
+    <section class="scenario-heading">
+      <div><p class="eyebrow">Active exercise</p><h2 id="scenario-title">Checkout outage</h2><p id="scenario-subtitle"></p></div>
+      <div class="status-block"><span id="exercise-status">open</span><strong><b id="exercise-score">0</b>/100</strong><small>exercise posture</small></div>
+    </section>
+
+    <section class="metric-grid" aria-label="Exercise metrics">
+      <article id="metric-impact" class="metric"><div><span>Impact</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
+      <article id="metric-uncertainty" class="metric"><div><span>Uncertainty</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
+      <article id="metric-fatigue" class="metric"><div><span>Fatigue</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
+      <article id="metric-trust" class="metric"><div><span>Trust</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>higher is better</small></article>
+      <article id="metric-service" class="metric"><div><span>Service</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>higher is better</small></article>
+    </section>
+
+    <section class="board-grid">
+      <article class="panel objectives-panel"><div class="panel-heading"><div><p class="eyebrow">Mission</p><h2>Objectives</h2></div></div><ul id="objective-list" class="objective-list"></ul></article>
+      <article class="panel inject-panel" data-view="injects"><div class="panel-heading"><div><p class="eyebrow">Scenario pressure</p><h2>Inject timeline</h2></div></div><ol id="inject-list" class="inject-list"></ol></article>
+      <article class="panel resource-panel"><div class="panel-heading"><div><p class="eyebrow">Finite capacity</p><h2>Resources</h2></div></div><ul id="resource-list" class="resource-list"></ul></article>
+      <article class="panel risk-panel" data-view="risks"><div class="panel-heading"><div><p class="eyebrow">Attention queue</p><h2>Open risks</h2></div></div><ul id="risk-list" class="risk-list"></ul></article>
+    </section>
+
+    <section class="response-section" data-view="responses">
+      <div class="section-heading"><div><p class="eyebrow">Human-control boundary</p><h2>Agent-staged response proposals</h2></div><p>The agent can prepare a response with expected simulated effects. Only a person can approve it as an exercise decision.</p></div>
+      <div id="proposal-list" class="proposal-grid"></div>
+    </section>
+
+    <section class="analysis-grid">
+      <article class="panel forecast-card" data-view="forecast"><div class="panel-heading"><div><p class="eyebrow">Seeded simulation</p><h2>60-minute forecast</h2></div><button id="run-forecast" class="button primary">Run forecast</button></div><div id="forecast-panel"></div></article>
+      <article class="panel comms-card" data-view="communications"><div class="panel-heading"><div><p class="eyebrow">Review before publish</p><h2>Communication drafts</h2></div></div><ul id="communication-list" class="communication-list"></ul></article>
+      <article class="panel activity-card"><div class="panel-heading"><div><p class="eyebrow">Observable history</p><h2>Activity trail</h2></div><button id="export-aar" class="button ghost">Export AAR</button></div><ol id="activity-list" class="activity-list"></ol></article>
+    </section>
+
+    <section class="closeout-gate" data-view="closeout">
+      <div><p class="eyebrow">Human-owned finish</p><h2>The agent may stage lessons. Only a person can close the drill.</h2><p id="closeout-status" class="closeout-status">No closeout recommendation is staged.</p></div>
+      <label>Closeout rationale<textarea id="closeout-rationale" rows="4" maxlength="900" placeholder="Summarize why the exercise can close and what remains unresolved."></textarea></label>
+      <label>Lessons learned, one per line<textarea id="closeout-lessons" rows="4" maxlength="1600" placeholder="Keep role ownership explicit.&#10;Draft stakeholder updates earlier."></textarea></label>
+      <label class="confirmation"><input id="closeout-check" type="checkbox"> I understand this is a training simulation, reviewed the record, and accept the closeout.</label>
+      <button id="closeout-button" class="button close">Close exercise & export AAR</button>
+    </section>
+  </main>
+
+  <footer><p>Training simulation only—not operational guidance for a live emergency.</p><a href="https://github.com/652036/web-mcp3">Source on GitHub</a></footer>
+
+  <dialog id="tool-dialog">
+    <form method="dialog" class="dialog-heading"><div><p class="eyebrow">Browser fallback</p><h2>WebMCP Tool Lab</h2></div><button id="close-tool-dialog" class="icon-button" aria-label="Close Tool Lab">×</button></form>
+    <p>Coach and facilitator roles expose different live tool sets. These are the same schemas registered with <code>document.modelContext</code>.</p>
+    <label>Tool<select id="tool-select"></select></label>
+    <label>JSON input<textarea id="tool-input" spellcheck="false">{}</textarea></label>
+    <button id="tool-run" class="button primary">Run tool</button>
+    <pre id="tool-output" aria-live="polite">Select a tool and run it.</pre>
+  </dialog>
+</body>
+</html>
