@@ -1,3 +1,5 @@
+import { assertToolOutputBudget } from './paging.js';
+
 function isObject(value) { return Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
 export function validateSchema(schema, input, path = 'input') {
   const errors = [];
@@ -26,27 +28,100 @@ export function validateSchema(schema, input, path = 'input') {
   } else if (schema.type === 'boolean' && typeof input !== 'boolean') errors.push(`${path} must be a boolean`);
   return errors;
 }
-export function toolResult(data, summary='Done') { return { content:[{type:'text',text:`${summary}\n${JSON.stringify(data,null,2)}`}], structuredContent:data }; }
-export function createWebMCPRegistry({ bridgeName='__webMCP', onStatus=()=>{} }={}) {
-  let definitions=[]; let controllers=[]; let signature=''; let mode='preview'; let lastError=null;
-  const getContext=()=>document.modelContext ?? navigator.modelContext ?? null;
-  async function sync(next) {
-    definitions=next;
-    const nextSignature=next.map((tool)=>tool.name).join('|');
-    if (nextSignature===signature) return;
-    signature=nextSignature; controllers.forEach((controller)=>controller.abort()); controllers=[];
-    const context=getContext();
-    if (!context?.registerTool) { mode='preview'; onStatus(status()); return; }
-    mode='native'; lastError=null;
-    for (const definition of definitions) {
-      const controller=new AbortController(); controllers.push(controller);
-      try { await context.registerTool(definition,{signal:controller.signal}); }
-      catch(error) { mode='preview'; lastError=error instanceof Error?error.message:String(error); }
+function publicDefinition({ name, title, description, inputSchema, annotations }) {
+  return { name, title, description, inputSchema, annotations };
+}
+
+function definitionSignature(definitions) {
+  return JSON.stringify(definitions.map(publicDefinition));
+}
+
+function defaultContext() {
+  return globalThis.document?.modelContext ?? null;
+}
+
+export function createWebMCPRegistry({ bridgeName = '__webMCP', onStatus = () => {}, contextProvider = defaultContext, bridgeTarget = globalThis.window } = {}) {
+  let definitions = [];
+  let controllers = [];
+  let nativeSignature = null;
+  let registeredContext = null;
+  let mode = 'preview';
+  let lastError = null;
+  let syncQueue = Promise.resolve();
+
+  function abortRegistrations() {
+    controllers.forEach((controller) => controller.abort());
+    controllers = [];
+    nativeSignature = null;
+    registeredContext = null;
+  }
+
+  async function executeDefinition(definition, input = {}, options = {}) {
+    if (options.signal?.aborted) throw new DOMException('Tool execution was cancelled.', 'AbortError');
+    const errors = validateSchema(definition.inputSchema, input);
+    if (errors.length) throw new Error(errors.join('; '));
+    return assertToolOutputBudget(await definition.execute(input, options));
+  }
+
+  async function syncNow(next) {
+    definitions = next;
+    const nextSignature = definitionSignature(next);
+    const context = contextProvider();
+    if (!context?.registerTool) {
+      abortRegistrations();
+      mode = 'preview';
+      lastError = null;
+      onStatus(status());
+      return;
+    }
+    if (registeredContext === context && nativeSignature === nextSignature) {
+      mode = 'native';
+      onStatus(status());
+      return;
+    }
+
+    abortRegistrations();
+    const pendingControllers = [];
+    try {
+      for (const definition of next) {
+        const controller = new AbortController();
+        pendingControllers.push(controller);
+        await context.registerTool({
+          ...publicDefinition(definition),
+          execute: (input, options = {}) => executeDefinition(definition, input, options),
+        }, { signal: controller.signal });
+      }
+      controllers = pendingControllers;
+      nativeSignature = nextSignature;
+      registeredContext = context;
+      mode = 'native';
+      lastError = null;
+    } catch (error) {
+      pendingControllers.forEach((controller) => controller.abort());
+      mode = 'preview';
+      lastError = error instanceof Error ? error.message : String(error);
     }
     onStatus(status());
   }
-  function listTools(){ return definitions.map(({name,description,inputSchema,annotations})=>({name,description,inputSchema,annotations})); }
-  async function executeTool(name,input={}){ const tool=definitions.find((candidate)=>candidate.name===name); if(!tool) throw new Error(`Unknown tool: ${name}`); const errors=validateSchema(tool.inputSchema,input); if(errors.length) throw new Error(errors.join('; ')); return tool.execute(input); }
-  function status(){ return {mode,toolCount:definitions.length,lastError,api:getContext()?(document.modelContext?'document.modelContext':'navigator.modelContext'):null}; }
-  const bridge={listTools,executeTool,status}; Object.defineProperty(window,bridgeName,{value:bridge,configurable:true}); return {sync,listTools,executeTool,status};
+
+  function sync(next) {
+    const requested = [...next];
+    syncQueue = syncQueue.then(() => syncNow(requested), () => syncNow(requested));
+    return syncQueue;
+  }
+
+  function listTools() { return definitions.map(publicDefinition); }
+  async function executeTool(name, input = {}, options = {}) {
+    const tool = definitions.find((candidate) => candidate.name === name);
+    if (!tool) throw new Error(`Unknown tool: ${name}`);
+    return executeDefinition(tool, input, options);
+  }
+  function status() {
+    const context = contextProvider();
+    const documentContext = globalThis.document?.modelContext;
+    return { mode, toolCount: definitions.length, registeredToolCount: mode === 'native' ? controllers.length : 0, lastError, api: context ? (documentContext === context ? 'document.modelContext' : 'custom') : null };
+  }
+  const bridge = { listTools, executeTool, status };
+  if (bridgeTarget) Object.defineProperty(bridgeTarget, bridgeName, { value: bridge, configurable: true });
+  return { sync, listTools, executeTool, status, destroy: abortRegistrations };
 }

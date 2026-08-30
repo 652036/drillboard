@@ -15,7 +15,7 @@
   <a class="skip-link" href="#main">Skip to command board</a>
   <header class="topbar">
     <a class="brand" href="#"><img src="assets/icon.svg" alt=""><span><strong>Drillboard</strong><small>human + agent tabletop simulator</small></span></a>
-    <div class="top-actions"><span id="webmcp-status" class="status-pill">Detecting WebMCP…</span><button id="tool-lab-button" class="button ghost">Tool Lab</button><button id="theme-toggle" class="button ghost">Light</button></div>
+    <div class="top-actions"><span id="webmcp-status" class="status-pill" aria-live="polite">Detecting WebMCP…</span><button id="tool-lab-button" class="button ghost">Tool Lab</button><button id="theme-toggle" class="button ghost">Light</button><p id="webmcp-error" class="webmcp-error" role="status" hidden></p></div>
   </header>
 
   <main id="main">
@@ -34,15 +34,15 @@
 
     <section class="scenario-heading">
       <div><p class="eyebrow">Active exercise</p><h2 id="scenario-title">Checkout outage</h2><p id="scenario-subtitle"></p></div>
-      <div class="status-block"><span id="exercise-status">open</span><strong><b id="exercise-score">0</b>/100</strong><small>exercise posture</small></div>
+      <div class="status-block"><span id="exercise-status" aria-live="polite">open</span><strong><b id="exercise-score">0</b>/100</strong><small>exercise posture</small></div>
     </section>
 
     <section class="metric-grid" aria-label="Exercise metrics">
-      <article id="metric-impact" class="metric"><div><span>Impact</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
-      <article id="metric-uncertainty" class="metric"><div><span>Uncertainty</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
-      <article id="metric-fatigue" class="metric"><div><span>Fatigue</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
-      <article id="metric-trust" class="metric"><div><span>Trust</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>higher is better</small></article>
-      <article id="metric-service" class="metric"><div><span>Service</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>higher is better</small></article>
+      <article id="metric-impact" class="metric" role="meter" aria-label="Impact" aria-valuemin="0" aria-valuemax="100"><div><span>Impact</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
+      <article id="metric-uncertainty" class="metric" role="meter" aria-label="Uncertainty" aria-valuemin="0" aria-valuemax="100"><div><span>Uncertainty</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
+      <article id="metric-fatigue" class="metric" role="meter" aria-label="Fatigue" aria-valuemin="0" aria-valuemax="100"><div><span>Fatigue</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>lower is better</small></article>
+      <article id="metric-trust" class="metric" role="meter" aria-label="Trust" aria-valuemin="0" aria-valuemax="100"><div><span>Trust</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>higher is better</small></article>
+      <article id="metric-service" class="metric" role="meter" aria-label="Service health" aria-valuemin="0" aria-valuemax="100"><div><span>Service</span><strong>0</strong></div><div class="meter"><i class="meter-fill"></i></div><small>higher is better</small></article>
     </section>
 
     <section class="board-grid">
@@ -53,22 +53,22 @@
     </section>
 
     <section class="response-section" data-view="responses">
-      <div class="section-heading"><div><p class="eyebrow">Human-control boundary</p><h2>Agent-staged response proposals</h2></div><p>The agent can prepare a response with expected simulated effects. Only a person can approve it as an exercise decision.</p></div>
-      <div id="proposal-list" class="proposal-grid"></div>
+      <div class="section-heading"><div><p class="eyebrow">Visible review boundary</p><h2>Agent-staged response proposals</h2></div><p>WebMCP can prepare a response with expected simulated effects. Finalization is reserved for the explicit visible review controls.</p></div>
+      <div id="proposal-list" class="proposal-grid" aria-live="polite"></div>
     </section>
 
     <section class="analysis-grid">
-      <article class="panel forecast-card" data-view="forecast"><div class="panel-heading"><div><p class="eyebrow">Seeded simulation</p><h2>60-minute forecast</h2></div><button id="run-forecast" class="button primary">Run forecast</button></div><div id="forecast-panel"></div></article>
+      <article class="panel forecast-card" data-view="forecast"><div class="panel-heading"><div><p class="eyebrow">Seeded simulation</p><h2>60-minute forecast</h2></div><button id="run-forecast" class="button primary">Run forecast</button></div><div id="forecast-panel" aria-live="polite"></div></article>
       <article class="panel comms-card" data-view="communications"><div class="panel-heading"><div><p class="eyebrow">Review before publish</p><h2>Communication drafts</h2></div></div><ul id="communication-list" class="communication-list"></ul></article>
       <article class="panel activity-card"><div class="panel-heading"><div><p class="eyebrow">Observable history</p><h2>Activity trail</h2></div><button id="export-aar" class="button ghost">Export AAR</button></div><ol id="activity-list" class="activity-list"></ol></article>
     </section>
 
     <section class="closeout-gate" data-view="closeout">
-      <div><p class="eyebrow">Human-owned finish</p><h2>The agent may stage lessons. Only a person can close the drill.</h2><p id="closeout-status" class="closeout-status">No closeout recommendation is staged.</p></div>
+      <div><p class="eyebrow">Explicit user finish</p><h2>WebMCP may stage lessons; entering review and closing require visible user confirmation.</h2><p id="closeout-status" class="closeout-status" aria-live="polite">No closeout recommendation is staged.</p></div>
       <label>Closeout rationale<textarea id="closeout-rationale" rows="4" maxlength="900" placeholder="Summarize why the exercise can close and what remains unresolved."></textarea></label>
       <label>Lessons learned, one per line<textarea id="closeout-lessons" rows="4" maxlength="1600" placeholder="Keep role ownership explicit.&#10;Draft stakeholder updates earlier."></textarea></label>
-      <label class="confirmation"><input id="closeout-check" type="checkbox"> I understand this is a training simulation, reviewed the record, and accept the closeout.</label>
-      <button id="closeout-button" class="button close">Close exercise & export AAR</button>
+      <label class="confirmation"><input id="closeout-check" type="checkbox"> I understand this is a training simulation, reviewed unresolved items, and accept the final closeout.</label>
+      <div class="closeout-actions"><button id="closeout-review-button" class="button primary">Enter closeout review</button><button id="resume-response-button" class="button ghost" hidden>Resume response</button><button id="closeout-button" class="button close" hidden>Close exercise & export AAR</button></div>
     </section>
   </main>
 
