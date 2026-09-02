@@ -4,6 +4,12 @@ const METRIC_KEYS = ['impact', 'uncertainty', 'fatigue', 'trust', 'service'];
 const BAD_METRICS = new Set(['impact', 'uncertainty', 'fatigue']);
 export const EXERCISE_PHASES = Object.freeze({ RESPONSE: 'response', CLOSEOUT_REVIEW: 'closeout-review', CLOSED: 'closed' });
 export const COLLECTION_LIMITS = Object.freeze({ injects: 50, proposals: 60, communications: 60, decisions: 60, observations: 100, forecasts: 8 });
+export const MAX_CLOSEOUT_LESSONS = 8;
+
+// Raw draft text is kept verbatim so a person can type spaces and newlines; normalization happens here, not on every keystroke.
+export function parseLessons(text) {
+  return String(text ?? '').split('\n').map((line) => line.trim()).filter(Boolean);
+}
 
 function assertResponsePhase(exercise, action = 'change the exercise') {
   if (exercise.status === 'closed' || exercise.phase === EXERCISE_PHASES.CLOSED) throw new Error('The exercise is closed and read-only.');
@@ -30,7 +36,6 @@ export function createExercise(presetKey = 'outage') {
     presetKey,
     title: preset.name,
     subtitle: preset.subtitle,
-    clockLabel: preset.clockLabel,
     role: 'coach',
     clock: 15,
     status: 'open',
@@ -44,15 +49,37 @@ export function createExercise(presetKey = 'outage') {
     decisions: [],
     observations: [],
     forecasts: [],
-    closeout: { staged: false, rationale: '', lessons: [], closedAt: null },
+    closeout: { staged: false, rationale: '', lessons: [], lessonsText: '', closedAt: null },
     sequence: 1,
   };
+}
+
+const EXERCISE_COLLECTIONS = ['resources', 'objectives', 'injects', 'proposals', 'communications', 'decisions', 'observations', 'forecasts'];
+
+// Guards against corrupted or foreign localStorage payloads before the UI or tools touch them.
+export function isValidExerciseShape(exercise) {
+  if (!exercise || typeof exercise !== 'object' || Array.isArray(exercise)) return false;
+  if (exercise.version !== 2) return false;
+  if (typeof exercise.presetKey !== 'string' || typeof exercise.title !== 'string') return false;
+  if (!Number.isFinite(exercise.clock) || !Number.isFinite(exercise.sequence)) return false;
+  if (!['open', 'closed'].includes(exercise.status) || !Object.values(EXERCISE_PHASES).includes(exercise.phase)) return false;
+  if (!['coach', 'facilitator'].includes(exercise.role)) return false;
+  if (!exercise.metrics || typeof exercise.metrics !== 'object' || METRIC_KEYS.some((key) => !Number.isFinite(exercise.metrics[key]))) return false;
+  if (EXERCISE_COLLECTIONS.some((key) => !Array.isArray(exercise[key]))) return false;
+  if (!exercise.closeout || typeof exercise.closeout !== 'object' || Array.isArray(exercise.closeout)) return false;
+  if (typeof exercise.closeout.rationale !== 'string' || !Array.isArray(exercise.closeout.lessons)) return false;
+  return true;
 }
 
 export function formatClock(minutes) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
   return `${String(hours).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
+
+// Tool output should never expose float noise such as 49.97999999999995.
+export function compactMetrics(metrics = {}) {
+  return Object.fromEntries(Object.entries(metrics).map(([key, value]) => [key, Number(Number(value).toFixed(1))]));
 }
 
 export function metricTone(key, value) {
@@ -295,6 +322,15 @@ function percentile(values, p) {
   return Number(sorted[index].toFixed(1));
 }
 
+export function fnv1a(text) {
+  let hash = 0x811c9dc5;
+  for (const character of String(text)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 export function forecastStateFingerprint(exercise) {
   const relevantState = {
     presetKey: exercise.presetKey,
@@ -306,12 +342,7 @@ export function forecastStateFingerprint(exercise) {
     decisions: exercise.decisions.map(({ proposalId, at }) => ({ proposalId, at })),
     approvedCommunications: exercise.communications.filter((item) => item.status === 'approved').map(({ id, reviewedAt }) => ({ id, reviewedAt })),
   };
-  let hash = 0x811c9dc5;
-  for (const character of JSON.stringify(relevantState)) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  return fnv1a(JSON.stringify(relevantState));
 }
 
 export function forecastStatus(exercise, forecast) {
@@ -389,14 +420,21 @@ export function forecastExercise(exercise, { horizonMinutes = 60, simulations = 
   };
 }
 
+// `lessons` is canonical; `lessonsText` is the verbatim draft shown in the textarea. Both write paths keep them aligned.
+export function closeoutLessons(closeout = {}) {
+  if (Array.isArray(closeout.lessons)) return closeout.lessons.map((lesson) => String(lesson).trim()).filter(Boolean);
+  return parseLessons(closeout.lessonsText);
+}
+
 export function closeoutReadiness(exercise) {
   const blockers = [];
   const rationale = exercise.closeout?.rationale?.trim() || '';
-  const lessons = (exercise.closeout?.lessons || []).map((lesson) => lesson.trim()).filter(Boolean);
+  const lessons = closeoutLessons(exercise.closeout);
   const stagedResponses = exercise.proposals.filter((proposal) => proposal.status === 'staged').length;
   const stagedCommunications = exercise.communications.filter((communication) => communication.status === 'staged').length;
   if (rationale.length < 20) blockers.push('Add a closeout rationale of at least 20 characters.');
   if (!lessons.length) blockers.push('Record at least one lesson learned.');
+  if (lessons.length > MAX_CLOSEOUT_LESSONS) blockers.push(`Record at most ${MAX_CLOSEOUT_LESSONS} closeout lessons.`);
   if (stagedResponses) blockers.push(`Review ${stagedResponses} staged response${stagedResponses === 1 ? '' : 's'}.`);
   if (stagedCommunications) blockers.push(`Review ${stagedCommunications} staged communication${stagedCommunications === 1 ? '' : 's'}.`);
   return { ready: blockers.length === 0, blockers, unresolvedInjects: exercise.injects.filter((inject) => inject.status === 'active').map((inject) => inject.id), openObjectives: exercise.objectives.filter((objective) => objective.status !== 'complete').map((objective) => objective.id) };
@@ -408,6 +446,7 @@ export function enterCloseoutReview(exercise) {
   if (!readiness.ready) throw new Error(readiness.blockers.join(' '));
   const next = structuredClone(exercise);
   next.phase = EXERCISE_PHASES.CLOSEOUT_REVIEW;
+  next.closeout = { ...next.closeout, rationale: next.closeout.rationale.trim(), lessons: closeoutLessons(next.closeout) };
   return { exercise: next, readiness };
 }
 
@@ -428,7 +467,7 @@ export function closeExercise(exercise, closedAt = new Date().toISOString()) {
   const next = structuredClone(exercise);
   next.status = 'closed';
   next.phase = EXERCISE_PHASES.CLOSED;
-  next.closeout = { ...next.closeout, staged: false, closedAt };
+  next.closeout = { ...next.closeout, staged: false, rationale: next.closeout.rationale.trim(), lessons: closeoutLessons(next.closeout), closedAt };
   return { exercise: next, readiness };
 }
 
@@ -489,7 +528,7 @@ export function exportAfterAction(exercise, activity = []) {
     ] : ['- No forecast recorded']), '',
     '## Closeout',
     markdownInline(exercise.closeout.rationale) || 'No closeout rationale recorded.',
-    ...exercise.closeout.lessons.map((lesson) => `- ${markdownInline(lesson)}`), '',
+    ...closeoutLessons(exercise.closeout).map((lesson) => `- ${markdownInline(lesson)}`), '',
     '## Activity trail',
     ...activity.slice().reverse().map((item) => `- ${markdownInline(item.time)} [${markdownInline(item.actor)}] ${markdownInline(item.label)}`), '',
     '> Training simulation only. This record is not operational guidance for a real emergency.',

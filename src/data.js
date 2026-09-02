@@ -2,7 +2,6 @@ export const PRESETS = Object.freeze({
   outage: {
     name: 'Checkout outage',
     subtitle: 'A cascading payment failure during a high-traffic product launch.',
-    clockLabel: 'Launch +',
     metrics: { impact: 48, uncertainty: 62, fatigue: 16, trust: 76, service: 58 },
     resources: [
       { id: 'sre', name: 'SRE responders', total: 5 },
@@ -23,7 +22,6 @@ export const PRESETS = Object.freeze({
   ransomware: {
     name: 'Ransomware drill',
     subtitle: 'A logistics operator loses dispatch visibility after suspicious encryption activity.',
-    clockLabel: 'Detection +',
     metrics: { impact: 42, uncertainty: 75, fatigue: 20, trust: 72, service: 63 },
     resources: [
       { id: 'security', name: 'Security analysts', total: 4 },
@@ -44,7 +42,6 @@ export const PRESETS = Object.freeze({
   festival: {
     name: 'Festival heat drill',
     subtitle: 'A crowded outdoor event faces a fast-rising heat index and transport delays.',
-    clockLabel: 'Gates open +',
     metrics: { impact: 32, uncertainty: 52, fatigue: 24, trust: 82, service: 76 },
     resources: [
       { id: 'medical', name: 'First-aid teams', total: 6 },

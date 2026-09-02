@@ -1,5 +1,33 @@
-import test from'node:test';import assert from'node:assert/strict';import{COLLECTION_LIMITS,EXERCISE_PHASES,addObservation,advanceExercise,closeExercise,closeoutReadiness,createExercise,createInject,decideCommunication,decideProposal,enterCloseoutReview,exerciseScore,exportAfterAction,forecastExercise,forecastStateFingerprint,forecastStatus,openRisks,resolveInject,resumeResponse,stageCommunication,stageProposal,updateObjective}from'../src/engine.js';
+import test from'node:test';import assert from'node:assert/strict';import{COLLECTION_LIMITS,EXERCISE_PHASES,MAX_CLOSEOUT_LESSONS,addObservation,advanceExercise,closeExercise,closeoutLessons,closeoutReadiness,compactMetrics,createExercise,createInject,decideCommunication,decideProposal,enterCloseoutReview,exerciseScore,exportAfterAction,fnv1a,forecastExercise,forecastStateFingerprint,forecastStatus,isValidExerciseShape,openRisks,parseLessons,resolveInject,resumeResponse,stageCommunication,stageProposal,updateObjective}from'../src/engine.js';
 test('advancing time applies active inject pressure deterministically',()=>{const exercise=createExercise('outage');const before={...exercise.metrics};const result=advanceExercise(exercise,30);assert.equal(result.exercise.clock,45);assert.ok(result.exercise.metrics.impact>before.impact);assert.ok(result.exercise.metrics.service<before.service);});
+test('stored exercise shape validation rejects corrupted payloads and accepts every preset lifecycle state',()=>{
+  for(const preset of['outage','ransomware','festival']){
+    const exercise=createExercise(preset);
+    assert.equal(isValidExerciseShape(exercise),true);
+    exercise.closeout.rationale='The learning goals are complete and unresolved items are documented.';exercise.closeout.lessons=['Keep the boundary explicit.'];
+    const reviewed=enterCloseoutReview(exercise).exercise;assert.equal(isValidExerciseShape(reviewed),true);
+    assert.equal(isValidExerciseShape(closeExercise(reviewed,'2026-08-30T00:00:00.000Z').exercise),true);
+  }
+  const base=createExercise('outage');
+  const broken=[
+    null,undefined,'string',[],{},{...base,version:1},{...base,injects:'not-an-array'},{...base,objectives:{}},{...base,proposals:null},{...base,communications:undefined},{...base,decisions:42},{...base,observations:'x'},{...base,forecasts:{}},{...base,resources:'sre'},
+    {...base,closeout:null},{...base,closeout:[]},{...base,closeout:{...base.closeout,lessons:'one'}},{...base,closeout:{...base.closeout,rationale:null}},
+    {...base,metrics:{impact:'high'}},{...base,metrics:null},{...base,clock:'15'},{...base,status:'paused'},{...base,phase:'unknown'},{...base,role:'admin'},{...base,presetKey:7},{...base,sequence:NaN},
+  ];
+  for(const [index,candidate] of broken.entries())assert.equal(isValidExerciseShape(candidate),false,`candidate ${index} should be rejected`);
+  assert.equal(fnv1a('drillboard'),fnv1a('drillboard'));
+  assert.notEqual(fnv1a('drillboard'),fnv1a('drillboarD'));
+  assert.match(fnv1a(''),/^[0-9a-f]{8}$/);
+});
+
+test('compactMetrics rounds tool-facing metrics to one decimal without float noise',()=>{
+  const advanced=advanceExercise(createExercise('outage'),30).exercise;
+  const compact=compactMetrics(advanced.metrics);
+  assert.deepEqual(Object.keys(compact),Object.keys(advanced.metrics));
+  for(const value of Object.values(compact)){assert.equal(typeof value,'number');assert.equal(value,Number(value.toFixed(1)));assert.ok(String(value).length<=5,`unexpected precision: ${value}`);}
+  assert.deepEqual(compactMetrics({impact:49.97999999999995,trust:0,service:100}),{impact:50,trust:0,service:100});
+});
+
 test('agent response remains staged until a human decision function approves it',()=>{const exercise=createExercise('outage');const staged=stageProposal(exercise,{title:'Route to backup processor',category:'continuity',rationale:'Reduce dependency on the failing payment path.',objective_id:'contain',resource_id:'sre',resource_units:2,effects:{impact:-10,uncertainty:-5,fatigue:2,trust:1,service:12}});assert.equal(staged.proposal.status,'staged');assert.equal(staged.exercise.decisions.length,0);const approved=decideProposal(staged.exercise,staged.proposal.id,'approved','Human approved');assert.equal(approved.exercise.decisions.length,1);assert.equal(approved.exercise.resources.find((item)=>item.id==='sre').allocated,2);assert.ok(approved.exercise.metrics.service>exercise.metrics.service);});
 test('facilitator inject creation uses bounded effects and stable ids',()=>{const exercise=createExercise('festival');const result=createInject(exercise,{title:'Water delivery delayed',description:'A supplier vehicle is held outside the event perimeter.',category:'vendor',severity:4,delay_minutes:10,deadline_minutes:40,effects:{impact:99,uncertainty:3,fatigue:2,trust:-2,service:-6}});assert.equal(result.inject.id,'inject-1');assert.equal(result.inject.effects.impact,20);assert.equal(result.inject.createdAt,25);});
 test('forecast is reproducible for a fixed seed',()=>{const exercise=createExercise('ransomware');const first=forecastExercise(exercise,{horizonMinutes:90,simulations:500,seed:77});const second=forecastExercise(exercise,{horizonMinutes:90,simulations:500,seed:77});assert.deepEqual(first,second);assert.ok(first.containmentProbability>=0&&first.containmentProbability<=100);});
@@ -31,5 +59,30 @@ test('forecast freshness exposes generation fingerprints and becomes stale after
 test('after-action Markdown neutralizes user-controlled chapter and HTML injection',()=>{const exercise=createExercise('outage');const forged='Visible text\n\n## Forged chapter\n<script>alert(1)</script>';exercise.title=forged;exercise.objectives[0].title=forged;exercise.objectives[0].owner=forged;exercise.injects[0].title=forged;exercise.injects[0].outcome=forged;exercise.decisions.push({id:'decision-malicious',proposalId:'proposal-malicious',title:forged,note:forged,at:exercise.clock});exercise.communications.push({id:'comms-malicious',audience:forged,purpose:'Status',message:forged,status:'approved',reviewedAt:exercise.clock});exercise.observations.push({id:'observation-malicious',text:forged,tags:[forged],at:exercise.clock});exercise.closeout.rationale=forged;exercise.closeout.lessons=[forged];const markdown=exportAfterAction(exercise,[{time:forged,actor:forged,label:forged}]);assert.equal(markdown.match(/^## /gm)?.length,9);assert.equal(markdown.match(/^## Human-approved decisions$/gm)?.length,1);assert.doesNotMatch(markdown,/^## Forged chapter$/m);assert.doesNotMatch(markdown,/<script>/);});
 
 test('critical exercise collections reject growth at their explicit limits',()=>{const injects=createExercise('outage');injects.injects=Array.from({length:COLLECTION_LIMITS.injects},(_,index)=>({id:`inject-cap-${index}`}));assert.throws(()=>createInject(injects,{title:'Beyond cap',description:'A fictional inject that should be rejected at capacity.',category:'vendor',severity:2,effects:{}}),/Inject limit reached/);const proposals=createExercise('outage');proposals.proposals=Array.from({length:COLLECTION_LIMITS.proposals},(_,index)=>({id:`proposal-cap-${index}`}));assert.throws(()=>stageProposal(proposals,{title:'Beyond cap',category:'continuity',rationale:'This staged response should be rejected at capacity.',effects:{}}),/Response proposal limit reached/);const communications=createExercise('outage');communications.communications=Array.from({length:COLLECTION_LIMITS.communications},(_,index)=>({id:`comms-cap-${index}`}));assert.throws(()=>stageCommunication(communications,{audience:'customers',purpose:'Beyond cap',message:'This communication should be rejected at capacity.'}),/Communication limit reached/);const observations=createExercise('outage');observations.observations=Array.from({length:COLLECTION_LIMITS.observations},(_,index)=>({id:`observation-cap-${index}`}));assert.throws(()=>addObservation(observations,{observation:'This observation should be rejected at capacity.'}),/Observation limit reached/);const decisionBase=stageProposal(createExercise('outage'),{title:'Capacity decision',category:'continuity',rationale:'This response reaches the human decision collection guard.',effects:{}}).exercise;decisionBase.decisions=Array.from({length:COLLECTION_LIMITS.decisions},(_,index)=>({id:`decision-cap-${index}`}));assert.throws(()=>decideProposal(decisionBase,decisionBase.proposals[0].id,'approved'),/Approved decision limit reached/);});
+
+test('closeout draft keeps raw lessons text and normalizes only at readiness/transition time',()=>{
+  const exercise=createExercise('outage');
+  exercise.closeout.rationale='  The learning goals are complete and unresolved items are documented.  ';
+  exercise.closeout.lessonsText='  Keep role ownership explicit.  \n\n\nDraft stakeholder updates earlier.\n';
+  exercise.closeout.lessons=parseLessons(exercise.closeout.lessonsText);
+  assert.deepEqual(closeoutLessons(exercise.closeout),['Keep role ownership explicit.','Draft stakeholder updates earlier.']);
+  assert.equal(exercise.closeout.lessonsText.includes('\n\n\n'),true);
+  assert.equal(closeoutReadiness(exercise).ready,true);
+  const tooMany=structuredClone(exercise);
+  tooMany.closeout.lessonsText=Array.from({length:MAX_CLOSEOUT_LESSONS+1},(_,index)=>`Lesson ${index}`).join('\n');
+  tooMany.closeout.lessons=parseLessons(tooMany.closeout.lessonsText);
+  assert.match(closeoutReadiness(tooMany).blockers.join(' '),new RegExp(`at most ${MAX_CLOSEOUT_LESSONS}`));
+  assert.throws(()=>enterCloseoutReview(tooMany),/at most/);
+  const entered=enterCloseoutReview(exercise).exercise;
+  assert.equal(entered.closeout.rationale,'The learning goals are complete and unresolved items are documented.');
+  assert.deepEqual(entered.closeout.lessons,['Keep role ownership explicit.','Draft stakeholder updates earlier.']);
+  assert.equal(entered.closeout.lessonsText,exercise.closeout.lessonsText);
+  const legacy=createExercise('outage');
+  delete legacy.closeout.lessonsText;
+  legacy.closeout.lessons=[' Legacy lesson ',''];
+  assert.deepEqual(closeoutLessons(legacy.closeout),['Legacy lesson']);
+  assert.deepEqual(closeoutLessons({lessonsText:'Only text\n\n  second  '}),['Only text','second']);
+  assert.match(exportAfterAction(entered,[]),/Draft stakeholder updates earlier/);
+});
 
 test('closeout readiness is rechecked after entering review',()=>{const exercise=createExercise('outage');exercise.closeout.rationale='The learning goals are complete and unresolved items are documented.';exercise.closeout.lessons=['Keep the visible review boundary explicit.'];const reviewed=enterCloseoutReview(exercise).exercise;reviewed.closeout.rationale='';assert.equal(closeoutReadiness(reviewed).ready,false);assert.throws(()=>closeExercise(reviewed),/Add a closeout rationale/);});

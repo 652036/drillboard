@@ -6,7 +6,7 @@ The distinguishing story is a browser agent changing roles inside one live exerc
 
 - Use `https://drillboard.st2p8g4tkf.chatgpt.site/` in a native WebMCP-capable browser.
 - Confirm the header pill says **Native WebMCP**, not Tool Lab fallback.
-- Reset to **Checkout outage**, **Coach**, response phase, with no stored proposals.
+- Reset to **Checkout outage**, **Coach**, response phase, with no stored proposals. If the board has unexported changes, Reset shows an inline confirmation; choose **Discard and reset**.
 - Keep browser zoom around 80–90% so the tool count, board changes, and human controls fit on screen.
 - Record audible narration. Export at 1080p and keep the public YouTube video under three minutes.
 
@@ -36,7 +36,7 @@ Show the proposal’s approval preview: metric before/after values, objective pr
 
 > “The site exposes no approval tool. The response remains staged and applies nothing until a person reviews these exact effects.”
 
-Click **Approve response**, add a short decision note, and show metrics, objective progress, resource allocation, and activity trail update together.
+Click **Approve response**; an inline note field opens on the card (no browser dialog). Keep or edit the note, press **Confirm approval**, and show metrics, objective progress, resource allocation, and activity trail update together.
 
 ### 1:12–1:47 — Human-selected Facilitator role changes capabilities
 

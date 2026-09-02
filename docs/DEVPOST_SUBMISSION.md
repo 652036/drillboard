@@ -12,8 +12,7 @@ A live incident-exercise room where people decide and browser agents coach or fa
 
 - **Production WebMCP URL:** https://drillboard.st2p8g4tkf.chatgpt.site/
 - **Public source:** https://github.com/652036/drillboard
-- **Demo video:** add the public YouTube URL before submission; audio required, under three minutes
-- **UI / Tool Lab preview:** https://652036.github.io/drillboard/ (fallback only; use it as the native entry only if registration is independently verified)
+- **Demo video:** TODO(video): replace with the public YouTube URL before submission — audio required, under three minutes. Do not submit with this placeholder.
 
 ## Inspiration
 
@@ -40,13 +39,14 @@ The implementation goes beyond a static list:
 
 - Coach has 9 response tools; Facilitator has up to 13.
 - Objective, resource, and active-inject IDs become live schema enums.
-- Changing role, phase, or IDs aborts old registrations and installs the new definitions.
+- Changing role, phase, or IDs re-registers only the tools whose public metadata changed; each tool owns its own `AbortController`, and the diff waits for any in-flight `execute()` to settle.
 - Closeout review and closed phases retain only 4 read-only tools.
 - Native and fallback executions use identical schema validation because preview browsers may not enforce schemas before callback invocation.
-- Registration retries after late API availability or a transient failure.
+- Registration retries after late API availability or a transient failure, and is skipped entirely when the page is framed.
 - Tool callbacks receive cancellation state through `options.signal`.
 - Native callbacks return one ordinary verifiable object, with no duplicated MCP wrapper.
-- Every result is limited to a 1,500-character serialized budget; room, risk, and AAR tools expose complete state through bounded section/cursor segments.
+- Tool descriptions state what each tool does and where the result appears on the board, enumerate every `section`/`kind`/`view` value, carry defaults, and give an effect-magnitude guide (±5 minor, ±10 material, ±15+ severe).
+- Every result is limited to a 4,000-character serialized budget; room and risk tools page whole items (`offset`/`limit`/`nextCursor`) so an LLM never receives half a JSON key, and the AAR tool segments Markdown by section and cursor.
 
 ## How it was built
 
@@ -54,10 +54,11 @@ Drillboard is a zero-runtime-dependency static app:
 
 - `src/engine.js` contains pure simulation, scoring, lifecycle, forecast, and export functions.
 - `src/app.js` owns visible state, persistence, informed review cards, and live tool definitions.
-- `src/paging.js` enforces bounded output and reconstructable JSON/Markdown segments.
+- `src/paging.js` enforces bounded output, item-based JSON pages, and reconstructable Markdown segments.
 - `src/webmcp.js` owns registration, AbortSignal unregistration, metadata fingerprinting, serialized sync, retry, validation, cancellation, and Tool Lab fallback.
 - A versioned PWA shell supports offline revisits without pinning clients to stale navigation.
 - CI runs syntax/static invariants, automated tests, and the production build.
+- Hosting is ChatGPT Sites, which sends no custom response headers; WebMCP works on the top-level document with the default `tools=self` policy, `index.html` carries its own CSP meta tag, and the registry refuses to register tools when framed. The `_headers` file is only for Netlify/Cloudflare-style hosts.
 
 Forecasting is intentionally a training stress test, not fake operational intelligence. It advances a deterministic copy through the same inject timing, effects, deadlines, and fatigue rules as the clock engine, then applies seeded variance. It reports P10/median/P90 for every metric and score, states the containment definition and limitations, and generates a run key from a fingerprint of forecast-relevant state plus inputs. Generation clock and generated/current fingerprints are visible to the person and tools; later state changes relabel the stored result as historical rather than current.
 
@@ -92,7 +93,7 @@ Most agent demos automate a fixed task. Drillboard instead treats the tool surfa
 
 ## Testing
 
-Run:
+Run (Node.js 22 or newer):
 
 ```bash
 npm ci
@@ -100,7 +101,7 @@ npm run verify
 npm run build
 ```
 
-Automated tests cover deterministic advancement and forecast reproducibility/freshness, future inject effects, partial exposure, activation-relative deadlines, score calibration, state fingerprints, proposal staging and approval, resource guards, bounded collections, transactional storage rollback, communication decisions, scheduled-risk visibility, lifecycle blockers including review-time invalidation, terminal closure, Markdown-safe AAR export, nested schema bounds, native validation, cancellation, re-registration, AbortSignal cleanup, late API availability, and registration retry.
+`npm run verify` runs the static verifier plus 55 automated tests across five files (`engine`, `paging`, `state`, `webmcp`, `app-contract`). They cover deterministic advancement and forecast reproducibility/freshness, future inject effects, partial exposure, activation-relative deadlines, score calibration, state fingerprints, proposal staging and approval, resource guards, bounded collections, transactional storage rollback, communication decisions, scheduled-risk visibility, lifecycle blockers including review-time invalidation, terminal closure, raw closeout draft text with an 8-lesson cap, stored-state shape validation, metric rounding, Markdown-safe AAR export, item-based paging (whole items, budget shrink, empty/out-of-range offsets), text segmentation, nested schema bounds, native validation, cancellation, per-tool registration diffing, in-flight sync deferral, embedded-frame refusal, AbortSignal cleanup, late API availability, registration retry, and UI contracts (no `prompt`/`confirm`, CSP meta without inline styles, labelled inline forms, focus restoration, a single live region, service-worker clone-before-cache).
 
 For native acceptance, open the production URL in a WebMCP-capable browser, verify the **Native WebMCP** pill, then follow `docs/DEMO_SCRIPT.md`. The 9 → 13 → 4 count change and visible board mutations are the primary acceptance path.
 
@@ -113,6 +114,6 @@ Custom scenario builders, multi-participant roles, facilitator-only information,
 - [ ] Confirm the production URL above opens without authentication
 - [ ] Run the native acceptance flow on that production origin
 - [ ] Record the 2:35 script with audible narration
-- [ ] Upload publicly to YouTube and insert the URL above and in Devpost
+- [ ] Upload publicly to YouTube and replace the `TODO(video)` placeholder above and in Devpost
 - [ ] Confirm the repository is public and MIT `LICENSE` is visible
 - [ ] Submit before **September 3, 2026 at 1:00 PM PDT**

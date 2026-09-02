@@ -11,5 +11,5 @@
     "verify": "npm run check && npm test",
     "build": "node scripts/build.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=22" }
 }

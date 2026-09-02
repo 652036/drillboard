@@ -32,72 +32,113 @@ function publicDefinition({ name, title, description, inputSchema, annotations }
   return { name, title, description, inputSchema, annotations };
 }
 
-function definitionSignature(definitions) {
-  return JSON.stringify(definitions.map(publicDefinition));
+function toolSignature(definition) {
+  return JSON.stringify(publicDefinition(definition));
 }
 
+// Chrome 150+ exposes document.modelContext; Chrome 149 previews exposed navigator.modelContext.
 function defaultContext() {
-  return globalThis.document?.modelContext ?? null;
+  return globalThis.document?.modelContext ?? globalThis.navigator?.modelContext ?? null;
 }
 
-export function createWebMCPRegistry({ bridgeName = '__webMCP', onStatus = () => {}, contextProvider = defaultContext, bridgeTarget = globalThis.window } = {}) {
+const nextMacrotask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+export const EMBEDDED_FRAME_REASON = 'Embedded frame: native tools disabled';
+
+function defaultEmbedded() {
+  try {
+    return globalThis.top !== globalThis.self;
+  } catch {
+    return true;
+  }
+}
+
+export function createWebMCPRegistry({ bridgeName = '__webMCP', onStatus = () => {}, contextProvider = defaultContext, bridgeTarget = globalThis.window, embedded = defaultEmbedded } = {}) {
   let definitions = [];
-  let controllers = [];
-  let nativeSignature = null;
+  // name -> { controller, signature }; each tool owns its AbortController so unrelated tools survive a diff.
+  const registrations = new Map();
   let registeredContext = null;
   let mode = 'preview';
   let lastError = null;
   let syncQueue = Promise.resolve();
+  let inFlight = 0;
+  let deferredDefinitions = null;
 
   function abortRegistrations() {
-    controllers.forEach((controller) => controller.abort());
-    controllers = [];
-    nativeSignature = null;
+    for (const entry of registrations.values()) entry.controller.abort();
+    registrations.clear();
     registeredContext = null;
+  }
+
+  function scheduleDeferredSync() {
+    if (inFlight > 0 || !deferredDefinitions) return;
+    const next = deferredDefinitions;
+    deferredDefinitions = null;
+    // Wait one macrotask so the browser observes the resolved execute() promise before any abort() runs.
+    syncQueue = syncQueue.then(nextMacrotask, nextMacrotask).then(() => syncNow(next));
   }
 
   async function executeDefinition(definition, input = {}, options = {}) {
     if (options.signal?.aborted) throw new DOMException('Tool execution was cancelled.', 'AbortError');
     const errors = validateSchema(definition.inputSchema, input);
     if (errors.length) throw new Error(errors.join('; '));
-    return assertToolOutputBudget(await definition.execute(input, options));
+    inFlight += 1;
+    try {
+      return assertToolOutputBudget(await definition.execute(input, options));
+    } finally {
+      inFlight -= 1;
+      scheduleDeferredSync();
+    }
+  }
+
+  function executeByName(name, input = {}, options = {}) {
+    const tool = definitions.find((candidate) => candidate.name === name);
+    if (!tool) return Promise.reject(new Error(`Unknown tool: ${name}`));
+    return executeDefinition(tool, input, options);
   }
 
   async function syncNow(next) {
     definitions = next;
-    const nextSignature = definitionSignature(next);
+    if (inFlight > 0) {
+      // Aborting a registration while its execute() is pending cancels that call in Chrome < 153; finish first.
+      deferredDefinitions = next;
+      onStatus(status());
+      return;
+    }
     const context = contextProvider();
-    if (!context?.registerTool) {
+    // Only the top-level document registers tools; a framed copy could otherwise expose them to an embedding page's agent.
+    if (embedded() || !context?.registerTool) {
       abortRegistrations();
       mode = 'preview';
       lastError = null;
       onStatus(status());
       return;
     }
-    if (registeredContext === context && nativeSignature === nextSignature) {
-      mode = 'native';
-      onStatus(status());
-      return;
-    }
+    if (registeredContext && registeredContext !== context) abortRegistrations();
 
-    abortRegistrations();
-    const pendingControllers = [];
+    const nextByName = new Map(next.map((definition) => [definition.name, definition]));
+    for (const [name, entry] of registrations) {
+      const candidate = nextByName.get(name);
+      if (candidate && toolSignature(candidate) === entry.signature) continue;
+      entry.controller.abort();
+      registrations.delete(name);
+    }
     try {
       for (const definition of next) {
+        if (registrations.has(definition.name)) continue;
         const controller = new AbortController();
-        pendingControllers.push(controller);
         await context.registerTool({
           ...publicDefinition(definition),
-          execute: (input, options = {}) => executeDefinition(definition, input, options),
+          execute: (input, options = {}) => executeByName(definition.name, input, options),
         }, { signal: controller.signal });
+        registrations.set(definition.name, { controller, signature: toolSignature(definition) });
       }
-      controllers = pendingControllers;
-      nativeSignature = nextSignature;
       registeredContext = context;
       mode = 'native';
       lastError = null;
     } catch (error) {
-      pendingControllers.forEach((controller) => controller.abort());
+      // A half-registered surface is misleading; drop everything so the next sync retries the full set.
+      abortRegistrations();
       mode = 'preview';
       lastError = error instanceof Error ? error.message : String(error);
     }
@@ -110,18 +151,27 @@ export function createWebMCPRegistry({ bridgeName = '__webMCP', onStatus = () =>
     return syncQueue;
   }
 
+  function idle() { return syncQueue; }
   function listTools() { return definitions.map(publicDefinition); }
-  async function executeTool(name, input = {}, options = {}) {
-    const tool = definitions.find((candidate) => candidate.name === name);
-    if (!tool) throw new Error(`Unknown tool: ${name}`);
-    return executeDefinition(tool, input, options);
-  }
+  function executeTool(name, input = {}, options = {}) { return executeByName(name, input, options); }
   function status() {
     const context = contextProvider();
     const documentContext = globalThis.document?.modelContext;
-    return { mode, toolCount: definitions.length, registeredToolCount: mode === 'native' ? controllers.length : 0, lastError, api: context ? (documentContext === context ? 'document.modelContext' : 'custom') : null };
+    const navigatorContext = globalThis.navigator?.modelContext;
+    const isEmbedded = embedded();
+    return {
+      mode,
+      toolCount: definitions.length,
+      registeredToolCount: mode === 'native' ? registrations.size : 0,
+      inFlight,
+      pendingSync: deferredDefinitions !== null,
+      lastError,
+      embedded: isEmbedded,
+      reason: isEmbedded ? EMBEDDED_FRAME_REASON : null,
+      api: context ? (documentContext === context ? 'document.modelContext' : navigatorContext === context ? 'navigator.modelContext' : 'custom') : null,
+    };
   }
   const bridge = { listTools, executeTool, status };
   if (bridgeTarget) Object.defineProperty(bridgeTarget, bridgeName, { value: bridge, configurable: true });
-  return { sync, listTools, executeTool, status, destroy: abortRegistrations };
+  return { sync, idle, listTools, executeTool, status, destroy: abortRegistrations };
 }

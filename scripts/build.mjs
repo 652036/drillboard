@@ -1,1 +1,12 @@
-import{cp,mkdir,rm}from'node:fs/promises';import{join}from'node:path';const root=process.cwd();const dist=join(root,'dist');await rm(dist,{recursive:true,force:true});await mkdir(dist,{recursive:true});for(const item of['index.html','styles.css','sw.js','manifest.webmanifest','assets','src','.openai','_headers'])await cp(join(root,item),join(dist,item),{recursive:true});console.log(`Built Drillboard static site in ${dist}`);
+import { cp, mkdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+
+const root = process.cwd();
+const dist = join(root, 'dist');
+// `.openai/hosting.json` is read from the repository root by the hosting CLI and must not ship inside dist.
+const items = ['index.html', 'styles.css', 'sw.js', 'manifest.webmanifest', 'assets', 'src', '_headers'];
+
+await rm(dist, { recursive: true, force: true });
+await mkdir(dist, { recursive: true });
+for (const item of items) await cp(join(root, item), join(dist, item), { recursive: true });
+console.log(`Built Drillboard static site in ${dist}`);

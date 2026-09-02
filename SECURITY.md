@@ -31,9 +31,13 @@ The current role and phase are visible page state. Tool callbacks also recheck r
 
 ## Registration integrity and cancellation
 
-Registrations use `AbortController`; role, phase, and schema changes abort the previous set. Full public metadata is fingerprinted so dynamic ID changes trigger re-registration. Partial registration failure aborts the attempted set, reports fallback status, and remains retryable. Native `execute(input, { signal })` wrappers reject already-cancelled calls before mutation.
+Each tool owns its own `AbortController`. On every sync the registry fingerprints each tool's public metadata and diffs by name: tools that disappeared or changed are aborted, tools that are new or changed are registered, and unchanged tools keep their existing registration. If a sync is requested while a native `execute()` is still pending (for example a tool call that mutates state and re-renders), the registry defers the diff until that call settles, because aborting a registration mid-call cancels the call in Chrome builds before 153. Partial registration failure aborts the attempted set, reports fallback status, and remains retryable. Native `execute(input, { signal })` wrappers reject already-cancelled calls before mutation.
 
-Native and Tool Lab execution enforce a 1,500-character serialized-result budget. Large state and AAR reads are segmented by explicit section and character cursor, preserving complete retrieval while preventing one tool call from reflecting an unbounded local collection. Native callbacks return a single plain object rather than duplicate MCP payload wrappers.
+## Top-level document only
+
+Drillboard registers WebMCP tools only when it is the top-level document (`window.top === window.self`). If the page is loaded inside an iframe, the registry stays in preview mode, performs no native registration, and the header status reads “Embedded frame: native tools disabled”. This prevents an embedding page from surfacing Drillboard's tools to its own agent context. The optional `_headers` file additionally sends `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'` on hosts that honour it.
+
+Native and Tool Lab execution enforce a 4,000-character serialized-result budget. Array-shaped room and risk sections are paged by whole item (`offset`/`limit`, `nextCursor`), so a page never splits a key or string and always parses as JSON; the Markdown AAR is segmented by section and character cursor. This preserves complete retrieval while preventing one tool call from reflecting an unbounded local collection. Native callbacks return a single plain object rather than duplicate MCP payload wrappers.
 
 ## Untrusted content
 
@@ -42,6 +46,8 @@ Descriptions, observations, rationales, inject text, and communication drafts ma
 ## Data and network
 
 Exercise state stays in browser `localStorage`. The app has no analytics, remote API, account system, secrets, or third-party runtime assets. Export creates a local Markdown file. The service worker caches only same-origin static assets.
+
+`index.html` declares a `<meta http-equiv="Content-Security-Policy">` (`default-src 'self'`, no inline scripts or styles, `object-src 'none'`) so the policy applies regardless of host. The production host, ChatGPT Sites, does not support custom response headers and therefore sends no `Origin-Agent-Cluster`, `Permissions-Policy`, or COOP headers; WebMCP does not require them on a top-level document (the browser default is `tools=self`). The `_headers` file is honoured only by hosts such as Netlify or Cloudflare Pages and intentionally omits `Cross-Origin-Embedder-Policy`.
 
 Do not place real incident secrets, personal data, credentials, regulated records, or live emergency instructions in a Drillboard scenario.
 
